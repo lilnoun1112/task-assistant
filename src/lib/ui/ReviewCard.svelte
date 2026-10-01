@@ -20,11 +20,13 @@
     {#if conf}<span class="badge {conf.cls}">{conf.label}</span>{/if}
   </div>
   <div class="why">{task.reason}</div>
-  {#if task.excerpt}<blockquote>{task.excerpt}</blockquote>{/if}
+  {#if task.evidence || task.excerpt}<blockquote title={task.evidence ? 'The words this suggestion is based on' : ''}>{task.evidence ?? task.excerpt}</blockquote>{/if}
   <div class="meta">
     {#if task.sender}<span class="badge">From {task.sender}</span>{/if}
     <span class="badge">{task.dueAt ? `Due ${formatDue(task.dueAt, now)}` : 'No deadline stated'}</span>
     <span class="badge">{formatRelative(task.createdAt, now)}</span>
+    {#if task.extractedBy === 'ollama'}<span class="badge" title="Suggested by your local AI model">Local AI</span>
+    {:else if task.extractedBy === 'rules'}<span class="badge" title="Suggested by keyword rules">Rules</span>{/if}
     {#each task.sources as s (s.sourceId)}<SourceBadge service={s.service} url={s.url} unavailable={s.status === 'unavailable'} />{/each}
   </div>
   <div class="buttons">

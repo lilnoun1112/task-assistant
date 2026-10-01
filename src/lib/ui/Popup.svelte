@@ -3,6 +3,7 @@
   import { SERVICE_LABEL, SOURCE_SERVICES, type Service, type TaskView } from '../core/types';
   import { bucketOf, buildSummary, isOverdue, matches, sortCompleted, sortTasks, type Bucket, type SortMode } from '../core/views';
   import { isTauri } from '../db/open';
+  import DailyBrief from './DailyBrief.svelte';
   import ReviewCard from './ReviewCard.svelte';
   import Settings from './Settings.svelte';
   import TaskRow from './TaskRow.svelte';
@@ -106,6 +107,13 @@
     </div>
   {/if}
 
+  {#if app.aiProblem}
+    <div class="ai-warn">
+      <span><strong>Local AI:</strong> {app.aiProblem}</span>
+      <button class="ghost" onclick={() => (app.aiProblem = null)} aria-label="Dismiss">✕</button>
+    </div>
+  {/if}
+
   {#if showSettings}
     <Settings onclose={() => (showSettings = false)} />
   {:else}
@@ -137,6 +145,7 @@
       {#if !app.ready}
         <p class="empty">{app.error ? `Couldn’t open local storage: ${app.error}` : 'Loading…'}</p>
       {:else if tab === 'today' || tab === 'upcoming'}
+        {#if tab === 'today'}<DailyBrief />{/if}
         <form class="add" onsubmit={addTask}>
           <input type="text" placeholder="Add a personal task…" bind:value={newTitle} aria-label="New task title" />
           <input type="date" bind:value={newDue} aria-label="Due date" />
@@ -238,6 +247,25 @@
     border-radius: 8px;
     background: var(--danger-soft);
     color: var(--danger);
+  }
+  .ai-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0 14px 8px;
+    padding: 6px 4px 6px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .ai-warn span {
+    flex: 1;
+    padding-top: 3px;
+  }
+  .ai-warn button {
+    padding: 0 6px;
+    color: inherit;
   }
   .tabs {
     display: flex;

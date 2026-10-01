@@ -3,7 +3,9 @@ import type { IncomingRecord, SyncBatch } from '../core/types';
 import type { Connector } from './engine';
 
 /**
- * Fake sources for Phase 1. `generation` 0 is the initial import; each
+ * Fake sources for trying the app. Messages carry no hand-made suggestion: they go through
+ * the same extraction (rules or the local model) as real Gmail/Slack messages will.
+ * `generation` 0 is the initial import; each
  * "Simulate refresh" bumps it and the sources change the way real ones do:
  * a renamed task, a moved deadline, a ticked Doc item, new messages.
  * Dates hang off a fixed `anchor` so the data doesn't shift at midnight.
@@ -75,8 +77,11 @@ export function sampleConnectors(anchor: Date, generation: number): Connector[] 
       sender: 'Dana Whitfield',
       excerpt: 'Could you send over the signed contract by Friday? Legal needs it before the kickoff.',
       url: 'https://mail.google.com/mail/u/0/#inbox/thr-1',
+      thread: [
+        { sender: 'You', text: 'Hi Dana, attached is the Northwind contract for review.' },
+        { sender: 'Dana Whitfield', text: 'Thanks! Legal is having a look.' },
+      ],
       sourceTimestamp: at(-1, 16, 12),
-      suggestion: { action: 'Send signed Northwind contract to Dana', reason: 'Direct request addressed to you ("Could you send…")', ownerConfidence: 'me', dueAt: null },
     },
     {
       sourceId: 'msg-2',
@@ -87,7 +92,17 @@ export function sampleConnectors(anchor: Date, generation: number): Connector[] 
       excerpt: 'Reminder: team lunch on Thursday at 12:30, see you there!',
       url: 'https://mail.google.com/mail/u/0/#inbox/thr-2',
       sourceTimestamp: at(-1, 9),
-      suggestion: null,
+    },
+    {
+      sourceId: 'msg-4',
+      threadId: 'thr-4',
+      kind: 'message',
+      title: "What's new this month",
+      sender: 'Toolbox Weekly <no-reply@toolbox.example>',
+      excerpt: 'Please join us for our product webinar next Tuesday! Can you guess what we shipped?',
+      url: 'https://mail.google.com/mail/u/0/#inbox/thr-4',
+      sourceTimestamp: at(-1, 7),
+      bulk: true,
     },
     ...(g >= 1
       ? [
@@ -100,7 +115,6 @@ export function sampleConnectors(anchor: Date, generation: number): Connector[] 
             excerpt: 'Someone needs to pick the final photos for the case study, maybe you or Alex? Deadline is the 15th.',
             url: 'https://mail.google.com/mail/u/0/#inbox/thr-3',
             sourceTimestamp: at(0, 8, 40),
-            suggestion: { action: 'Pick final photos for the case study', reason: 'Request, but addressed to "you or Alex"', ownerConfidence: 'unclear' as const, dueAt: null },
           },
         ]
       : []),
@@ -116,7 +130,6 @@ export function sampleConnectors(anchor: Date, generation: number): Connector[] 
       excerpt: 'hey! can you review my PR for the pricing page today? 🙏',
       url: 'https://slack.com/app_redirect?channel=D01',
       sourceTimestamp: at(0, 9, 5),
-      suggestion: { action: "Review Priya's PR for the pricing page", reason: 'Direct request in a DM ("can you review")', ownerConfidence: 'me', dueAt: d(0) },
     },
     {
       sourceId: 'D02:1727770000.0002',
@@ -127,7 +140,6 @@ export function sampleConnectors(anchor: Date, generation: number): Connector[] 
       excerpt: 'haha did you see the new coffee machine',
       url: 'https://slack.com/app_redirect?channel=D02',
       sourceTimestamp: at(0, 9, 30),
-      suggestion: null,
     },
   ];
 

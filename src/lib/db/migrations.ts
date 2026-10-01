@@ -81,6 +81,10 @@ export const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  `
+  ALTER TABLE tasks ADD COLUMN evidence TEXT;
+  ALTER TABLE tasks ADD COLUMN extracted_by TEXT;
+  `,
 ];
 
 /** Split on `;` at line ends. Fine for our own DDL (no triggers / string literals with `;`). */

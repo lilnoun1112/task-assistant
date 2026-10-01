@@ -3,3 +3,6 @@ dist
 src-tauri/target
 src-tauri/gen
 *.db
+
+# Real messages for scoring the extractor stay on this machine
+*.local.jsonl
