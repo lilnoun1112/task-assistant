@@ -1,0 +1,146 @@
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface-2: #f0eee9;
+  --border: #e3e0d8;
+  --text: #1f1d1a;
+  --muted: #6d6860;
+  --accent: #4f46e5;
+  --accent-soft: #e8e7fd;
+  --danger: #c2410c;
+  --danger-soft: #fdeee6;
+  --warn: #a16207;
+  --warn-soft: #fdf5d8;
+  --ok: #15803d;
+  --radius: 10px;
+  --asana: #f06a6a;
+  --gdoc: #3b82f6;
+  --calendar: #0ea5a4;
+  --gmail: #ea4335;
+  --slack: #7c3aed;
+  --local: #78716c;
+  color-scheme: light;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18171a;
+    --surface: #222126;
+    --surface-2: #2c2a31;
+    --border: #39363f;
+    --text: #ecebef;
+    --muted: #9c98a6;
+    --accent: #8b85ff;
+    --accent-soft: #2f2c4d;
+    --danger: #fb923c;
+    --danger-soft: #3b2418;
+    --warn: #facc15;
+    --warn-soft: #39321a;
+    --ok: #4ade80;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body.popup {
+  background: var(--bg);
+  overflow: hidden;
+}
+
+body.sprite {
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 7px;
+  padding: 4px 10px;
+}
+
+button:hover {
+  background: var(--surface-2);
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+button.ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+button.ghost:hover {
+  background: var(--surface-2);
+}
+
+input[type='text'],
+input[type='search'],
+input[type='date'],
+textarea,
+select {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 7px;
+  padding: 5px 8px;
+  min-width: 0;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
+  text-decoration: none;
+  border: 0;
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
