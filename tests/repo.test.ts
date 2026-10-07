@@ -200,7 +200,7 @@ describe('sync engine', () => {
     const ok: Connector = { service: 'asana', account: 'me', fetch: async () => snap(asanaTask()) };
     await runSync(repo, [ok], NOW);
     const broken: Connector = { service: 'asana', account: 'me', fetch: async () => { throw new Error('401 token expired'); } };
-    const [report] = await runSync(repo, [broken], later(30));
+    const { reports: [report] } = await runSync(repo, [broken], later(30));
     expect(report).toMatchObject({ ok: false, error: '401 token expired' });
     expect(await repo.listTasks()).toHaveLength(1);
     const [status] = await repo.getSyncStatus();

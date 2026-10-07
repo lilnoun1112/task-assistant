@@ -116,3 +116,36 @@ export function buildSummary(tasks: TaskView[], now: Date): Summary {
   const text = parts.length ? parts.join(' · ') : 'Nothing pressing. Nice.';
   return { overdue, dueToday, meetings, unreviewed, text };
 }
+
+function shortTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function listTitles(items: TaskView[], max = 3): string {
+  const names = items.slice(0, max).map((t) => t.title);
+  return items.length > max ? `${names.join(', ')} +${items.length - max} more` : names.join(', ');
+}
+
+/** Bullet brief without any model; also the fallback when the local model is off or fails. */
+export function deterministicDigest(s: Summary): string[] {
+  const bullets: string[] = [];
+  if (s.overdue.length) bullets.push(`Overdue: ${listTitles(s.overdue)}`);
+  if (s.dueToday.length) bullets.push(`Due today: ${listTitles(s.dueToday)}`);
+  if (s.meetings.length)
+    bullets.push(`Meetings: ${s.meetings.slice(0, 3).map((m) => `${m.title} (${shortTime(m.startsAt!)})`).join(', ')}${s.meetings.length > 3 ? ` +${s.meetings.length - 3} more` : ''}`);
+  if (s.unreviewed.length) {
+    const from = [...new Set(s.unreviewed.map((t) => t.sender).filter(Boolean))].slice(0, 3).join(', ');
+    bullets.push(`${s.unreviewed.length} request${s.unreviewed.length === 1 ? '' : 's'} to review${from ? ` from ${from}` : ''}`);
+  }
+  return bullets;
+}
+
+/** Compact input for the model's daily brief: the same facts the deterministic digest uses. */
+export function digestItems(s: Summary): { kind: 'overdue' | 'due_today' | 'meeting' | 'request'; title: string; when?: string | null; from?: string | null }[] {
+  return [
+    ...s.overdue.map((t) => ({ kind: 'overdue' as const, title: t.title, when: t.dueAt })),
+    ...s.dueToday.map((t) => ({ kind: 'due_today' as const, title: t.title, when: t.dueAt })),
+    ...s.meetings.map((t) => ({ kind: 'meeting' as const, title: t.title, when: t.startsAt })),
+    ...s.unreviewed.map((t) => ({ kind: 'request' as const, title: t.title, from: t.sender })),
+  ];
+}

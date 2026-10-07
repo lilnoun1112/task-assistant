@@ -29,14 +29,32 @@ export interface IncomingRecord {
   /** Nearby heading (Doc), project name (Asana), channel (Slack)... */
   context?: string | null;
   sourceTimestamp?: string | null;
-  /** Messages only: present when extraction thinks this is a request for the user. */
-  suggestion?: {
-    action: string;
-    reason: string;
-    ownerConfidence: OwnerConfidence;
-    /** Only an explicit date from the message. Never inferred. */
-    dueAt?: string | null;
-  } | null;
+  /**
+   * Messages only. `undefined` = not analysed yet (the sync engine runs extraction on new
+   * messages); `null` = analysed, not a request; an object = a suggested task for review.
+   */
+  suggestion?: Suggestion | null;
+  /** Messages only, used for extraction and never stored: full text of this message. */
+  body?: string | null;
+  /** Messages only, never stored: earlier messages in the thread, oldest first. */
+  thread?: { sender: string; text: string }[];
+  /** Messages only: sent by the user (used as thread context, never a request). */
+  fromMe?: boolean;
+  /** Messages only: newsletter / automated / bulk mail (List-Unsubscribe, no-reply...). */
+  bulk?: boolean;
+}
+
+export type ExtractorId = 'rules' | 'ollama' | 'source';
+
+export interface Suggestion {
+  action: string;
+  reason: string;
+  ownerConfidence: OwnerConfidence;
+  /** Only an explicit date from the message. Never inferred. */
+  dueAt?: string | null;
+  /** Exact words from the message that make this a request. */
+  evidence?: string | null;
+  extractedBy?: ExtractorId;
 }
 
 export interface SyncBatch {
@@ -111,6 +129,8 @@ export interface TaskView {
   action: string | null;
   reason: string | null;
   ownerConfidence: OwnerConfidence | null;
+  evidence: string | null;
+  extractedBy: ExtractorId | null;
   sender: string | null;
   context: string | null;
   sources: { service: Service; url: string | null; status: SourceRecord['status']; sourceId: string }[];
