@@ -1,10 +1,10 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import spriteUrl from '../../assets/sprite.svg';
 
   // Click toggles the popup; press-and-move drags the window.
   let start: { x: number; y: number } | null = null;
-  let blink = $state(false);
 
   function down(e: PointerEvent) {
     if (e.button !== 0) return;
@@ -22,33 +22,14 @@
     start = null;
     await invoke('toggle_popup');
   }
-
-  setInterval(() => {
-    blink = true;
-    setTimeout(() => (blink = false), 160);
-  }, 4200);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="sprite" onpointerdown={down} onpointermove={move} onpointerup={up} title="Task assistant">
-  <svg viewBox="0 0 96 96" width="80" height="80" aria-hidden="true">
-    <ellipse cx="48" cy="88" rx="24" ry="4" fill="rgba(0,0,0,.18)" />
-    <path d="M18 54c0-19 13-36 30-36s30 17 30 36c0 16-12 28-30 28S18 70 18 54z" fill="#6c63ff" />
-    <path d="M26 52c0-14 10-27 22-27" stroke="#9b95ff" stroke-width="5" stroke-linecap="round" fill="none" />
-    <circle cx="48" cy="14" r="5" fill="#ffcf5c" />
-    <path d="M48 19v-0" stroke="#6c63ff" stroke-width="3" />
-    {#if blink}
-      <path d="M33 52h8M55 52h8" stroke="#1f1d1a" stroke-width="3" stroke-linecap="round" />
-    {:else}
-      <ellipse cx="37" cy="52" rx="4" ry="5.5" fill="#1f1d1a" />
-      <ellipse cx="59" cy="52" rx="4" ry="5.5" fill="#1f1d1a" />
-      <circle cx="38.5" cy="50" r="1.4" fill="#fff" />
-      <circle cx="60.5" cy="50" r="1.4" fill="#fff" />
-    {/if}
-    <path d="M42 64q6 5 12 0" stroke="#1f1d1a" stroke-width="3" stroke-linecap="round" fill="none" />
-    <circle cx="29" cy="61" r="3.5" fill="#ff8fab" opacity=".7" />
-    <circle cx="67" cy="61" r="3.5" fill="#ff8fab" opacity=".7" />
-  </svg>
+  <div class="float">
+    <img src={spriteUrl} alt="" draggable="false" />
+  </div>
+  <div class="shadow"></div>
 </div>
 
 <style>
@@ -58,11 +39,73 @@
     display: grid;
     place-items: center;
     cursor: pointer;
+    position: relative;
   }
-  svg {
-    transition: transform 0.15s ease;
+  /* Same on-screen footprint as the original character: about 52×64 px. */
+  img {
+    display: block;
+    width: 52px;
+    height: 64px;
+    pointer-events: none;
+    user-select: none;
+    /* Keeps the white mask readable on light desktops. */
+    filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.12));
+    transition: transform 0.2s ease;
   }
-  .sprite:hover svg {
-    transform: translateY(-2px) scale(1.03);
+  .sprite:hover img {
+    transform: scale(1.05);
+  }
+  /* Gentle hover: bob up and down with a slight sway, slightly out of sync so it never looks mechanical. */
+  .float {
+    animation: bob 3.2s ease-in-out infinite, sway 5.3s ease-in-out infinite;
+    transform-origin: 50% 40%;
+  }
+  .shadow {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    width: 34px;
+    height: 6px;
+    margin-left: -17px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.22);
+    filter: blur(2px);
+    animation: shadow 3.2s ease-in-out infinite;
+  }
+  @keyframes bob {
+    0%,
+    100% {
+      translate: 0 -2px;
+    }
+    50% {
+      translate: 0 3px;
+    }
+  }
+  @keyframes sway {
+    0%,
+    100% {
+      rotate: -2.5deg;
+    }
+    50% {
+      rotate: 2.5deg;
+    }
+  }
+  /* The shadow shrinks when the mask rises, grows when it sinks. */
+  @keyframes shadow {
+    0%,
+    100% {
+      transform: scale(0.8);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .float,
+    .shadow {
+      animation: none;
+    }
   }
 </style>
