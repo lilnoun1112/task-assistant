@@ -3,8 +3,8 @@ dist
 src-tauri/target
 src-tauri/gen
 *.db
-client_secret_1033575202378-a67cohnedkotjeeinu0p0s17be1gr4um.apps.googleusercontent.com.json
-=======
+# Google OAuth client file (downloaded from Google Cloud); never commit it
+client_secret*.json
+
 # Real messages for scoring the extractor stay on this machine
 *.local.jsonl
->>>>>>> 58b8c6002cb1719cb8cee45a9bc3c9436c3e36b4
