@@ -228,3 +228,18 @@ describe('sync engine', () => {
     expect(unclear.dueAt).toBeNull(); // "the 15th" is not turned into an invented date
   });
 });
+
+describe('deleting', () => {
+  it('a deleted task stays deleted when its source is synced again', async () => {
+    await repo.applySync('asana', 'me', snap(asanaTask()), NOW);
+    await repo.applySync('slack', 'me', { mode: 'incremental', records: [msg('m1', true)] }, NOW);
+    for (const t of await repo.listTasks()) {
+      await repo.setCompleted(t.id, true, NOW);
+      await repo.deleteTask(t.id);
+    }
+    // same items re-sent, one even with a changed due date
+    await repo.applySync('asana', 'me', snap(asanaTask({ dueAt: '2026-10-09' })), later(30));
+    await repo.applySync('slack', 'me', { mode: 'incremental', records: [{ ...msg('m1', true), suggestion: undefined }] }, later(30));
+    expect(await repo.listTasks()).toHaveLength(0);
+  });
+});
