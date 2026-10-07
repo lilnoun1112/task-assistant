@@ -1,5 +1,6 @@
 import type { Db, SqlValue } from '../db/db';
 import type {
+  ExtractorId,
   IncomingRecord,
   OwnerConfidence,
   Origin,
@@ -57,6 +58,8 @@ interface TaskRow {
   reason: string | null;
   owner_confidence: OwnerConfidence | null;
   suggested_due: string | null;
+  evidence: string | null;
+  extracted_by: ExtractorId | null;
   created_at: string;
   updated_at: string;
 }
@@ -229,9 +232,10 @@ export class TaskRepository {
       if (!rec.suggestion) return false;
       const s = rec.suggestion;
       ({ lastInsertId: taskId } = await this.db.execute(
-        `INSERT INTO tasks (origin, review_state, action, reason, owner_confidence, suggested_due, created_at, updated_at)
-         VALUES ('suggestion', 'pending', ?, ?, ?, ?, ?, ?)`,
-        [s.action, s.reason, s.ownerConfidence, s.dueAt ?? null, ts, ts],
+        `INSERT INTO tasks (origin, review_state, action, reason, owner_confidence, suggested_due, evidence, extracted_by,
+           created_at, updated_at)
+         VALUES ('suggestion', 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [s.action, s.reason, s.ownerConfidence, s.dueAt ?? null, s.evidence ?? null, s.extractedBy ?? 'source', ts, ts],
       ));
     } else {
       ({ lastInsertId: taskId } = await this.db.execute(
@@ -296,12 +300,24 @@ export class TaskRepository {
         action: t.action,
         reason: t.reason,
         ownerConfidence: t.owner_confidence,
+        evidence: t.evidence,
+        extractedBy: t.extracted_by,
         sender: primary?.sender ?? null,
         context: primary?.context ?? null,
         sources: records.map((r) => ({ service: r.service, url: r.url, status: r.status, sourceId: r.sourceId })),
         subtasks: subsByTask.get(t.id) ?? [],
       };
     });
+  }
+
+  /** True once a record has been stored, so extraction runs only on genuinely new messages. */
+  async hasRecord(service: Service, account: string, sourceId: string): Promise<boolean> {
+    const rows = await this.db.select('SELECT 1 FROM source_records WHERE service = ? AND account = ? AND source_id = ?', [
+      service,
+      account,
+      sourceId,
+    ]);
+    return rows.length > 0;
   }
 
   async getTask(id: number): Promise<TaskView | undefined> {

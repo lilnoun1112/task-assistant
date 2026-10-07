@@ -4,7 +4,8 @@ A small floating character that opens one private, editable overview of your wor
 Asana, Google Calendar, a Google Doc checklist, Gmail and Slack DMs. All changes stay local, and the app
 never writes anything back to those services.
 
-**Status: Phase 1 (Foundation) done.** That covers the sprite, popup, editable list, SQLite storage and sample data.
+**Status:** Phase 1 (Foundation) is done: sprite, popup, editable list, SQLite storage and sample data. Local AI
+extraction (from Phase 4) is also in, so emails and DMs can be read by a free model running on your own computer.
 Real connectors are Phase 2 and 3.
 
 ## Run it
@@ -19,6 +20,7 @@ npm run dev              # popup only, in a browser at http://localhost:1420 (us
 npm test                 # data layer tests (node:sqlite)
 npm run check            # svelte-check / TypeScript
 npm run tauri build      # installer (NSIS/MSI on Windows)
+npm run eval             # score request detection on labelled messages (see "Local AI")
 ```
 
 To try it: open ⚙ Settings, choose **Load sample data**, edit some tasks, then choose **Simulate refresh**. The
@@ -33,10 +35,12 @@ src/lib/core/repo.ts       TaskRepository: refresh-merge rules + all local edits
 src/lib/core/views.ts      Today/Upcoming/Review/Done bucketing, filters, sort, daily summary
 src/lib/db/                Db interface, migrations, adapters (Tauri plugin-sql / sql.js / node:sqlite)
 src/lib/sync/engine.ts     Connector interface + runSync (per-source error isolation)
-src/lib/sync/sample.ts     fake connectors for Phase 1
+src/lib/sync/sample.ts     fake connectors for trying the app
+src/lib/extract/           request detection: pre-filter, keyword rules, Ollama client, output checks, deadlines
+scripts/eval-extract.ts    scoring script; evals/sample-messages.jsonl is a synthetic labelled set
 src/lib/ui/                Svelte 5 components (Popup, TaskRow, ReviewCard, Settings, Sprite)
 src-tauri/                 Rust shell: sprite + popup windows, tray menu, autostart, window-state
-tests/repo.test.ts         acceptance tests for the data rules
+tests/                     data-rule and extraction tests (incl. a stand-in Ollama server)
 ```
 
 ## Data model and merge rules
@@ -68,6 +72,54 @@ Each sync step is idempotent, and the cursor only moves forward after a successf
 interrupted halfway converges on the next run. A failing source keeps its previous data, and the popup shows
 which source is stale and why.
 
+## Local AI (reading mail and DMs)
+
+New emails and Slack DMs are checked for requests addressed to you. They land in **Review** as suggestions,
+and nothing becomes a task until you accept it. Settings → *Reading mail and DMs* picks the engine:
+
+- **Keyword rules** (default): no setup. It catches requests phrased the obvious way ("can you…", "please…").
+- **Local AI model (Ollama)**: free, and messages never leave your computer. It also catches implicit and
+  indirect requests.
+
+Setting up Ollama:
+
+1. Install [Ollama](https://ollama.com) and make sure it's running (it sits in the tray on Windows).
+2. `ollama pull qwen3:8b` downloads about 5 GB and needs roughly 8 GB of free memory. On a lighter laptop use
+   `qwen3:4b`. Any instruction-tuned chat model works; pick whichever scores best on your messages (below).
+3. In the app: Settings → Local AI model → **Check connection**, pick the model, and enter your name and handles.
+
+How it works (`src/lib/extract/`):
+
+| Step | What happens |
+|---|---|
+| Pre-filter | Your own messages, newsletters/bulk mail, no-reply senders, calendar notifications and small talk ("thanks!") are skipped without calling the model |
+| Extraction | The model gets the latest message plus up to 5 earlier thread messages and must answer in a fixed JSON format: is it a request, who it's for, a short action, an **exact quote**, and the **exact deadline words** |
+| Checks in code | If the quote isn't really in the message, ownership becomes "unclear". The model never supplies a date: the app parses the deadline words itself and only accepts unambiguous ones ("by Friday", "Oct 10"). "The 15th" becomes a note, never a date |
+| Fallback | If Ollama is down or too slow, that sync uses keyword rules and the popup says so |
+| Once only | Each message is analysed once, when first seen. Re-fetches don't call the model again |
+
+The **daily brief** on the Today tab is written by the local model from your stored tasks (3–6 bullets). Without
+a model, or if the model fails, a rule-based brief is shown instead.
+
+### Scoring it on your own messages
+
+Copy 50–100 real messages into `evals/<anything>.local.jsonl`, one per line, in the format of
+`evals/sample-messages.jsonl`, and label each one. Files ending in `.local.jsonl` are git-ignored. Then run:
+
+```bash
+npm run eval -- --engine both --model qwen3:8b --name Marcell --file evals/mine.local.jsonl
+```
+
+This prints requests found, suggestions that were correct, owner and due-date accuracy, invented dates, time per
+message, and every miss. Use it to compare models, or to compare local against an API model later. On the
+synthetic sample set, keyword rules find 6 of 9 requests and raise 1 false alarm.
+
+### Switching to an API model later
+
+Extractors share one small interface (`src/lib/extract/types.ts`). An API-backed extractor (e.g. Claude) is one
+more file next to `ollama.ts` that reuses the same prompt, JSON format and checks, plus a settings option. Your
+labelled `.local.jsonl` set then tells you whether the switch is worth it.
+
 ## Roadmap
 
 | Phase | Deliverable | Acceptance check |
@@ -75,7 +127,7 @@ which source is stale and why.
 | 1 ✅ Foundation | Sprite, popup, editable list, SQLite, sample data | Tasks persist after restart; edits survive simulated refresh |
 | 2 Explicit tasks | Asana (PAT), Google Doc checklist, Calendar | Assigned tasks, unchecked Doc items and real meetings show with links; time logs stay out |
 | 3 Communications | Gmail + Slack DM incremental import, review queue | New requests appear once, chat can be dismissed, thread links work |
-| 4 Refinement | Extraction tuning, relationship suggestions, optional local model | Measured on a real message sample |
+| 4 Refinement | ✅ Local model extraction + daily brief; next: tuning on real messages, relationship suggestions | Measured on a real message sample |
 | 5 Packaging | Windows installer, settings, backup / clear data, reconnect flows | Usable without dev tools |
 
 Phase 2 also adds OS keychain storage for tokens (`keyring` crate) and the Google loopback OAuth flow (PKCE).
