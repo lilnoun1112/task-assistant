@@ -1,7 +1,7 @@
 <script lang="ts">
   import { formatRelative } from '../core/dates';
   import { SERVICE_LABEL, SOURCE_SERVICES, type Service, type TaskView } from '../core/types';
-  import { bucketOf, buildSummary, isOverdue, matches, sortCompleted, sortTasks, type Bucket, type SortMode } from '../core/views';
+  import { bucketOf, buildSummary, matches, sortCompleted, sortTasks, type Bucket, type SortMode } from '../core/views';
   import { isTauri } from '../db/open';
   import DailyBrief from './DailyBrief.svelte';
   import ReviewCard from './ReviewCard.svelte';
@@ -9,11 +9,12 @@
   import TaskRow from './TaskRow.svelte';
   import { app } from './state.svelte';
 
-  type Tab = 'today' | 'upcoming' | 'review' | 'completed';
-  let tab = $state<Tab>('today');
+  type Tab = 'pending' | 'done';
+  let tab = $state<Tab>('pending');
   let search = $state('');
   let services = $state<Service[]>([]);
   let sort = $state<SortMode>('due');
+  let showFilters = $state(false);
   let showSettings = $state(false);
   let newTitle = $state('');
   let newDue = $state('');
@@ -28,28 +29,15 @@
     }
     return m;
   });
+  const filtersActive = $derived(search.trim() !== '' || services.length > 0 || sort !== 'due');
   const filter = $derived({ search, services: new Set(services) });
   const visible = (list: TaskView[]) => list.filter((t) => matches(t, filter));
 
-  const todayGroups = $derived.by(() => {
-    const list = sortTasks(visible(byBucket.today), sort);
-    return [
-      { label: 'Overdue', items: list.filter((t) => isOverdue(t, now)) },
-      { label: 'Meetings', items: list.filter((t) => t.kind === 'meeting') },
-      { label: 'Due today', items: list.filter((t) => t.kind !== 'meeting' && !isOverdue(t, now)) },
-    ].filter((g) => g.items.length);
-  });
-  const upcomingGroups = $derived.by(() => {
-    const list = sortTasks(visible(byBucket.upcoming), sort);
-    const dated = list.filter((t) => t.dueAt || t.startsAt);
-    const undated = list.filter((t) => !t.dueAt && !t.startsAt);
-    return sort === 'priority'
-      ? [{ label: '', items: list }]
-      : [
-          { label: 'Scheduled', items: dated },
-          { label: 'No date', items: undated },
-        ].filter((g) => g.items.length);
-  });
+  // Pending = everything still open, in one list. Suggestions from mail/DMs sit on top
+  // because they need a yes/no before they become tasks.
+  const toReview = $derived(sortTasks(visible(byBucket.review), 'due'));
+  const openTasks = $derived(sortTasks(visible([...byBucket.today, ...byBucket.upcoming]), sort));
+  const pendingCount = $derived(byBucket.review.length + byBucket.today.length + byBucket.upcoming.length);
 
   const staleSources = $derived(app.status.filter((s) => s.lastError));
   const lastSync = $derived(
@@ -58,6 +46,12 @@
 
   function toggleService(s: Service) {
     services = services.includes(s) ? services.filter((x) => x !== s) : [...services, s];
+  }
+
+  function clearFilters() {
+    search = '';
+    services = [];
+    sort = 'due';
   }
 
   async function addTask(e: SubmitEvent) {
@@ -73,12 +67,9 @@
     await getCurrentWindow().hide();
   }
 
-  const tabs: { id: Tab; label: string; count: () => number }[] = [
-    { id: 'today', label: 'Today', count: () => byBucket.today.length },
-    { id: 'upcoming', label: 'Upcoming', count: () => byBucket.upcoming.length },
-    { id: 'review', label: 'Review', count: () => byBucket.review.length },
-    { id: 'completed', label: 'Done', count: () => byBucket.completed.length },
-  ];
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus();
+  }
 </script>
 
 <div class="shell">
@@ -88,6 +79,17 @@
       <div class="sumtext" data-tauri-drag-region>{summary.text}</div>
     </div>
     <div class="head-actions">
+      <button
+        class="ghost icon filter-btn"
+        class:on={showFilters}
+        title="Search, sort and filter"
+        aria-label="Search, sort and filter"
+        aria-expanded={showFilters}
+        onclick={() => (showFilters = !showFilters)}
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18l-7 8.5V19l-4 2v-7.5L3 5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg>
+        {#if filtersActive}<span class="active-dot"></span>{/if}
+      </button>
       <button class="ghost icon" title="Refresh now" aria-label="Refresh now" onclick={() => app.sync()} disabled={app.syncing}>
         <span class:spin={app.syncing}>↻</span>
       </button>
@@ -118,64 +120,72 @@
     <Settings onclose={() => (showSettings = false)} />
   {:else}
     <div class="tabs" role="tablist">
-      {#each tabs as t}
-        <button role="tab" aria-selected={tab === t.id} class:active={tab === t.id} onclick={() => (tab = t.id)}>
-          {t.label}
-          {#if t.count()}<span class="count" class:attention={t.id === 'review'}>{t.count()}</span>{/if}
-        </button>
-      {/each}
+      <button role="tab" aria-selected={tab === 'pending'} class:active={tab === 'pending'} onclick={() => (tab = 'pending')}>
+        Pending {#if pendingCount}<span class="count">{pendingCount}</span>{/if}
+      </button>
+      <button role="tab" aria-selected={tab === 'done'} class:active={tab === 'done'} onclick={() => (tab = 'done')}>
+        Done {#if byBucket.completed.length}<span class="count">{byBucket.completed.length}</span>{/if}
+      </button>
     </div>
 
-    <div class="toolbar">
-      <input type="search" placeholder="Search" bind:value={search} aria-label="Search tasks" />
-      <select bind:value={sort} aria-label="Sort">
-        <option value="due">By date</option>
-        <option value="priority">By priority</option>
-      </select>
-    </div>
-    <div class="chips">
-      {#each [...SOURCE_SERVICES, 'local' as const] as s}
-        <button class="chip" class:on={services.includes(s)} onclick={() => toggleService(s)} aria-pressed={services.includes(s)}>
-          <span class="dot" style:background="var(--{s})"></span>{SERVICE_LABEL[s]}
-        </button>
-      {/each}
-    </div>
+    {#if showFilters}
+      <div class="filters">
+        <div class="toolbar">
+          <input type="search" placeholder="Search" bind:value={search} aria-label="Search tasks" use:focusOnMount />
+          <select bind:value={sort} aria-label="Sort">
+            <option value="due">By date</option>
+            <option value="priority">By priority</option>
+          </select>
+        </div>
+        <div class="chips">
+          {#each [...SOURCE_SERVICES, 'local' as const] as s}
+            <button class="chip" class:on={services.includes(s)} onclick={() => toggleService(s)} aria-pressed={services.includes(s)}>
+              <span class="dot" style:background="var(--{s})"></span>{SERVICE_LABEL[s]}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {:else if filtersActive}
+      <div class="filtered">
+        Filtered{search.trim() ? ` by “${search.trim()}”` : ''}{services.length ? ` · ${services.map((s) => SERVICE_LABEL[s]).join(', ')}` : ''}{sort === 'priority' ? ' · by priority' : ''}
+        <button class="ghost" onclick={clearFilters}>Clear</button>
+      </div>
+    {/if}
 
     <main>
       {#if !app.ready}
         <p class="empty">{app.error ? `Couldn’t open local storage: ${app.error}` : 'Loading…'}</p>
-      {:else if tab === 'today' || tab === 'upcoming'}
-        {#if tab === 'today'}<DailyBrief />{/if}
+      {:else if tab === 'pending'}
+        <DailyBrief />
         <form class="add" onsubmit={addTask}>
           <input type="text" placeholder="Add a personal task…" bind:value={newTitle} aria-label="New task title" />
           <input type="date" bind:value={newDue} aria-label="Due date" />
           <button class="primary" type="submit" disabled={!newTitle.trim()}>Add</button>
         </form>
-        {@const groups = tab === 'today' ? todayGroups : upcomingGroups}
-        {#each groups as g (g.label)}
-          {#if g.label}<h3>{g.label}</h3>{/if}
+        {#if toReview.length}
+          <h3>Needs review <span class="muted">· from mail and DMs</span></h3>
           <ul>
-            {#each g.items as t (t.id)}<TaskRow task={t} {now} />{/each}
+            {#each toReview as t (t.id)}<ReviewCard task={t} {now} />{/each}
           </ul>
-        {:else}
+          {#if openTasks.length}<h3>Tasks</h3>{/if}
+        {/if}
+        <ul>
+          {#each openTasks as t (t.id)}<TaskRow task={t} {now} />{/each}
+        </ul>
+        {#if !toReview.length && !openTasks.length}
           <p class="empty">
             {#if app.tasks.length === 0}
               No tasks yet. Add one above, or open ⚙ Settings → Load sample data.
-            {:else if search || services.length}
+            {:else if filtersActive}
               Nothing matches these filters.
             {:else}
-              {tab === 'today' ? 'Nothing due today.' : 'Nothing upcoming.'}
+              All clear. Nothing pending.
             {/if}
           </p>
-        {/each}
-      {:else if tab === 'review'}
-        <p class="explain">Requests found in mail and DMs. Nothing here becomes a task until you add it.</p>
-        <ul>
-          {#each sortTasks(visible(byBucket.review), 'due').reverse() as t (t.id)}<ReviewCard task={t} {now} />{:else}<p class="empty">All caught up.</p>{/each}
-        </ul>
+        {/if}
       {:else}
         <ul>
-          {#each sortCompleted(visible(byBucket.completed)) as t (t.id)}<TaskRow task={t} {now} />{:else}<p class="empty">Nothing completed yet.</p>{/each}
+          {#each sortCompleted(visible(byBucket.completed)) as t (t.id)}<TaskRow task={t} {now} />{:else}<p class="empty">{filtersActive ? 'Nothing matches these filters.' : 'Nothing completed yet.'}</p>{/each}
         </ul>
         {#if byBucket.snoozed.length}
           <details>
@@ -295,9 +305,46 @@
     margin-left: 3px;
     font-weight: 500;
   }
-  .count.attention {
+  .filter-btn {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+  }
+  .filter-btn.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .active-dot {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
     background: var(--accent);
-    color: white;
+  }
+  .filters {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 2px;
+  }
+  .filtered {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .filtered button {
+    font-size: 12px;
+    padding: 1px 6px;
+    color: var(--accent);
+  }
+  h3 .muted {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
   }
   .toolbar {
     display: flex;
@@ -359,17 +406,11 @@
   .add input[type='date'] {
     width: 130px;
   }
-  .empty,
-  .explain {
+  .empty {
     color: var(--muted);
     font-size: 13px;
     text-align: center;
     margin: 24px 0;
-  }
-  .explain {
-    text-align: left;
-    font-size: 12px;
-    margin: 6px 0 10px;
   }
   details {
     margin-top: 12px;

@@ -32,7 +32,7 @@ survive.
 ```
 src/lib/core/types.ts      domain types (IncomingRecord, SyncBatch, TaskView…)
 src/lib/core/repo.ts       TaskRepository: refresh-merge rules + all local edits
-src/lib/core/views.ts      Today/Upcoming/Review/Done bucketing, filters, sort, daily summary
+src/lib/core/views.ts      pending/done bucketing, filters, sort, daily summary
 src/lib/db/                Db interface, migrations, adapters (Tauri plugin-sql / sql.js / node:sqlite)
 src/lib/sync/engine.ts     Connector interface + runSync (per-source error isolation)
 src/lib/sync/sample.ts     fake connectors for trying the app
@@ -42,6 +42,17 @@ src/lib/ui/                Svelte 5 components (Popup, TaskRow, ReviewCard, Sett
 src-tauri/                 Rust shell: sprite + popup windows, tray menu, autostart, window-state
 tests/                     data-rule and extraction tests (incl. a stand-in Ollama server)
 ```
+
+## Popup layout
+
+- **Pending**: everything still open in one list. Suggestions from mail and DMs sit on top under
+  *Needs review* until you accept or reject them; then come tasks and meetings, sorted by date (or priority).
+- **Done**: completed tasks, newest first, each with a delete icon (click once to arm, again to delete).
+  Snoozed and dismissed items are folded away below and can be restored.
+- The **filter icon** in the header opens search, sort and source filters. While a filter is active, the icon
+  shows a dot and a "Filtered … Clear" line stays visible.
+
+Deleting a task is permanent: syncing the same item again does not bring it back.
 
 ## Data model and merge rules
 
@@ -98,7 +109,7 @@ How it works (`src/lib/extract/`):
 | Fallback | If Ollama is down or too slow, that sync uses keyword rules and the popup says so |
 | Once only | Each message is analysed once, when first seen. Re-fetches don't call the model again |
 
-The **daily brief** on the Today tab is written by the local model from your stored tasks (3–6 bullets). Without
+The **daily brief** at the top of the Pending tab is written by the local model from your stored tasks (3–6 bullets). Without
 a model, or if the model fails, a rule-based brief is shown instead.
 
 ### Scoring it on your own messages
@@ -139,4 +150,3 @@ Phase 2 also adds OS keychain storage for tokens (`keyring` crate) and the Googl
   using `rusqlite` with a real transaction.
 - "Hide" from the brief is treated the same as Dismiss. Dismissed items are listed under Done → Dismissed and
   can be restored.
-- Undated tasks go under Upcoming → No date, not under Today.

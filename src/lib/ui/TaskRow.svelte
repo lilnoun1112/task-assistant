@@ -9,6 +9,19 @@
 
   let open = $state(false);
   let newSub = $state('');
+  // Delete needs two clicks: the first arms the button for a few seconds.
+  let confirmDelete = $state(false);
+  let confirmTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function deleteClick() {
+    if (confirmDelete) {
+      clearTimeout(confirmTimer);
+      app.remove(task.id);
+      return;
+    }
+    confirmDelete = true;
+    confirmTimer = setTimeout(() => (confirmDelete = false), 3000);
+  }
 
   const done = $derived(!!task.completedAt);
   const overdue = $derived(isOverdue(task, now));
@@ -68,6 +81,17 @@
         {#if task.origin === 'personal'}<span class="badge"><span class="dot" style:background="var(--local)"></span>Personal</span>{/if}
       </span>
     </button>
+    {#if done}
+      <button
+        class="ghost trash"
+        class:armed={confirmDelete}
+        title={confirmDelete ? 'Click again to delete' : 'Delete'}
+        aria-label={confirmDelete ? 'Confirm delete' : 'Delete task'}
+        onclick={deleteClick}
+      >
+        {#if confirmDelete}Delete?{:else}<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}
+      </button>
+    {/if}
   </div>
 
   {#if open}
@@ -157,7 +181,7 @@
           {/each}
           <button onclick={() => app.dismiss(task.id)}>Dismiss</button>
         {/if}
-        {#if task.origin === 'personal' || allGone}
+        {#if task.origin === 'personal' || allGone || done}
           <button class="danger" onclick={() => app.remove(task.id)}>Delete</button>
         {/if}
       </div>
@@ -188,6 +212,24 @@
     height: 16px;
     accent-color: var(--accent);
     flex: none;
+  }
+  .trash {
+    flex: none;
+    align-self: center;
+    height: 26px;
+    min-width: 26px;
+    padding: 0 6px;
+    display: inline-grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .trash:hover {
+    color: var(--danger);
+  }
+  .trash.armed {
+    color: white;
+    background: var(--danger);
   }
   .title-btn {
     all: unset;
